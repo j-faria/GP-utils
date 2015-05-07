@@ -7,14 +7,6 @@ module gputils
     real(kind=8), parameter, private :: pi = 3.1415926535897932384626433832795029d0
     real(kind=8), parameter, private :: const1 = 0.9189385332046727417803297364056176398d0 ! 0.5*ln(2*pi)
 
-    ! extra integers to be saved between calls to mean_fun_keplerian
-    integer, save :: gp_n_planets
-    integer, save :: gp_n_planet_pars ! this should be 5*nplanets + 1*nobservatories
-
-    ! arrays holding variables on which the RVs depend linearly - used in mean_fun_keplerian_plus_lin
-    real(kind=8), allocatable, dimension(:), save :: linvar1, linvar2, linvar3
-
-
     ! base type for Gaussian Process kernels
     type Kernel
         real(kind=8), dimension(:), allocatable :: pars
@@ -155,6 +147,7 @@ contains
     end function new_Kernel
 
 
+<<<<<<< HEAD
     function new_GP(cov_matrix, kernel_ptr, subkernel_ptr1, subkernel_ptr2)
         ! this is the GP derived-type constructor
         real(kind=8), dimension(:, :) :: cov_matrix
@@ -177,9 +170,7 @@ contains
 
     end function new_GP
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!! Kernel functions and subroutines follow !!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
+
 
     function evaluate_kernel(self, x1, x2) result(matrix)
         ! dummy method: subclasses should implement this themselves
@@ -198,7 +189,6 @@ contains
 
         if (size(self%pars) /= 1) STOP 'Wrong parameter dimension - ConstantKernel(1 hyper)'
         call fill_matrix_with_value(matrix, self%pars(1)**2)
-
     end function evaluate_kernel_ConstantKernel
 
 
@@ -503,10 +493,6 @@ contains
     end function sample_prior
 
 
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-    !!! GP functions and subroutines follow !!!
-    !!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!
-
     function mean_fun_template(x, args) result(mean)
         ! dummy method: subclasses should implement this themselves 
         ! by assigning a suitable function to GP%mean_fun
@@ -521,47 +507,6 @@ contains
 
         mean = args(1)
     end function mean_fun_constant
-
-    function mean_fun_keplerian(x, args) result(mean)
-        ! Keplerian mean function - args should contain [ (P,K,ecc,omega,t0)*nplanets, vsys ]
-        real(kind=8), dimension(:), intent(in) :: x, args
-        real(kind=8), dimension(size(x)) :: mean
-        integer :: n
-        n = size(x)
-        print *, 'here'
-        ! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
-        call get_rvN(x, &
-                     args(1:gp_n_planet_pars-1:5), & ! periods for all planets
-                     args(2:gp_n_planet_pars-1:5), & ! K for all planets
-                     args(3:gp_n_planet_pars-1:5), & ! ecc for all planets
-                     args(4:gp_n_planet_pars-1:5), & ! omega for all planets
-                     args(5:gp_n_planet_pars-1:5), & ! t0 for all planets
-                     args(gp_n_planet_pars), & ! systematic velocity
-                     mean, n, gp_n_planets)
-
-    end function mean_fun_keplerian
-
-    function mean_fun_keplerian_plus_lin(x, args) result(mean)
-        ! Keplerian mean function plus linear dependence on other variables
-        !  args should contain [ (P,K,ecc,omega,t0)*nplanets, vsys ]
-        real(kind=8), dimension(:), intent(in) :: x, args
-        real(kind=8), dimension(size(x)) :: mean
-        integer :: n
-        n = size(x)
-
-        ! ATTENTION: the systematic velocity argument below only allows for one observatory!!!
-        call get_rvN(x, &
-                     args(1:gp_n_planet_pars-1:5), & ! periods for all planets
-                     args(2:gp_n_planet_pars-1:5), & ! K for all planets
-                     args(3:gp_n_planet_pars-1:5), & ! ecc for all planets
-                     args(4:gp_n_planet_pars-1:5), & ! omega for all planets
-                     args(5:gp_n_planet_pars-1:5), & ! t0 for all planets
-                     args(gp_n_planet_pars), & ! systematic velocity
-                     mean, n, gp_n_planets)
-
-        mean = mean + 1.0d0 * linvar1
-
-    end function mean_fun_keplerian_plus_lin
 
 
     function is_posdef(self) result(is)
@@ -609,7 +554,6 @@ contains
             if (size(yerr) /= N) STOP 'Dimension mismatch in get_lnlikelihood'
             call add_array_to_diagonal(cov_cho_factor, yerr**2)
         end if
-        !cov_cho_factor_copy = cov_cho_factor
 
         ! solve the linear system using the cholesky method
         if (size(args) == 1 .and. args(1) == 0.d0) then
@@ -672,13 +616,11 @@ contains
         if (rc /= 0) STOP 'Error in choly. Matrix is not positive definite?'
 
         ! calculate predictive mean
-        !print *, 'evaluate kernel with t,x'
         Kxs = self%gp_kernel%evaluate_kernel(t, x)
         mu = matmul(Kxs, xsol) + self%mean_fun(t, args)
 
         ! calculate predictive covariance
         Kxs_trans = transpose(Kxs)
-        !print *, 'evaluate kernel with t,t'
         cov = self%gp_kernel%evaluate_kernel(t, t)
         ! LAPACK routine - DPOTRS solves a system of linear equations A*X = B
         !                  using the Cholesky factorization (for matrix B of rhs)
